@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
-    <title>3D City Test</title>
+    <title>3D Pompeii Explorer</title>
     <style>
         body {
             margin: 0;
@@ -13,115 +13,211 @@
         }
     </style>
 
-    <!-- Modern, reliable Three.js CDN -->
-   <script src="https://unpkg.com/three@0.152.2/build/three.min.js"></script>
+    <!-- Three.js (stable CDN, works with GitHub Pages) -->
+    <script src="https://unpkg.com/three@0.152.2/build/three.min.js"></script>
 
-    <!-- OrbitControls from same version -->
- <script src="https://unpkg.com/three@0.152.2/examples/js/controls/OrbitControls.js"></script>
+    <!-- OrbitControls from same Three.js version -->
+    <script src="https://unpkg.com/three@0.152.2/examples/js/controls/OrbitControls.js"></script>
 </head>
 <body>
 <script>
-// === BASIC SCENE SETUP ===
+// ===================== BASIC SCENE SETUP =====================
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0xa0d8f0);
+scene.background = new THREE.Color(0x87ceeb); // sky blue
 
 const camera = new THREE.PerspectiveCamera(
     60,
     window.innerWidth / window.innerHeight,
     0.1,
-    1000
+    2000
 );
-camera.position.set(150, 150, 250);
+camera.position.set(250, 200, 350);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
 document.body.appendChild(renderer.domElement);
 
-// LIGHTS
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+// ===================== LIGHTING =====================
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
 scene.add(ambientLight);
 
-const sun = new THREE.DirectionalLight(0xffffff, 1);
-sun.position.set(100, 200, 100);
+const sun = new THREE.DirectionalLight(0xffffff, 1.0);
+sun.position.set(300, 400, 200);
+sun.castShadow = true;
+sun.shadow.mapSize.width = 2048;
+sun.shadow.mapSize.height = 2048;
 scene.add(sun);
 
-// === IMPROVED ORBIT CONTROLS ===
+// ===================== ORBIT CONTROLS =====================
 const controls = new THREE.OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.05;
-
-controls.rotateSpeed = 0.8;
+controls.rotateSpeed = 0.7;
 controls.zoomSpeed = 1.0;
 controls.panSpeed = 0.8;
 
-// Make the camera orbit around the center of the city
-controls.target.set(0, 20, 0);
+// Focus on center of town
+controls.target.set(0, 10, 0);
 
-
-// === GROUND ===
-const groundGeometry = new THREE.PlaneGeometry(800, 800);
-const groundMaterial = new THREE.MeshStandardMaterial({ color: 0x99cc99 });
+// ===================== GROUND (TOWN PLATFORM) =====================
+const groundGeometry = new THREE.PlaneGeometry(1200, 1200);
+const groundMaterial = new THREE.MeshStandardMaterial({ color: 0xc9b28a }); // dusty earth
 const ground = new THREE.Mesh(groundGeometry, groundMaterial);
 ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
 scene.add(ground);
 
+// ===================== UTILITY FUNCTIONS =====================
+function createBox(w, h, d, color) {
+    const geo = new THREE.BoxGeometry(w, h, d);
+    const mat = new THREE.MeshStandardMaterial({ color });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    return mesh;
+}
 
-// === STREETS ===
-function createStreet(x, z, width, depth) {
-    const geometry = new THREE.BoxGeometry(width, 0.1, depth);
-    const material = new THREE.MeshStandardMaterial({ color: 0x333333 });
-    const street = new THREE.Mesh(geometry, material);
-    street.position.set(x, 0.05, z);
+function createStreet(x, z, width, depth, rotation = 0) {
+    const street = createBox(width, 0.5, depth, 0x555555);
+    street.position.set(x, 0.25, z);
+    street.rotation.y = rotation;
     scene.add(street);
+    return street;
 }
 
-// Horizontal streets
-createStreet(0, -50, 600, 20);
-createStreet(0, 0, 600, 20);
-createStreet(0, 50, 600, 20);
-
-// Vertical streets
-createStreet(-100, 0, 20, 300);
-createStreet(0, 0, 20, 300);
-createStreet(100, 0, 20, 300);
-
-
-// === BUILDINGS ===
-function createBuilding(x, z, width, height, depth, color) {
-    const geometry = new THREE.BoxGeometry(width, height, depth);
-    const material = new THREE.MeshStandardMaterial({ color });
-    const building = new THREE.Mesh(geometry, material);
-    building.position.set(x, height / 2, z);
+function createBuildingBlock(x, z, w, d, stories = 1, color = 0xb36b4c) {
+    const heightPerStory = 8;
+    const h = stories * heightPerStory;
+    const building = createBox(w, h, d, color);
+    building.position.set(x, h / 2, z);
     scene.add(building);
+    return building;
 }
 
-const buildingColors = [0xff6666, 0x66a3ff, 0xffcc66, 0x66ff99, 0xcc99ff];
+// ===================== POMPEII-LIKE CITY LAYOUT =====================
+// Main cardo (north-south street) and decumanus (east-west street)
+createStreet(0, 0, 40, 800);    // main north-south
+createStreet(0, 0, 800, 40);    // main east-west
 
-for (let i = -250; i <= 250; i += 50) {
-    createBuilding(i, -80, 20, Math.random() * 40 + 20, 20,
-        buildingColors[Math.floor(Math.random() * buildingColors.length)]
-    );
-    createBuilding(i, 80, 20, Math.random() * 40 + 20, 20,
-        buildingColors[Math.floor(Math.random() * buildingColors.length)]
-    );
-    createBuilding(-130, i, 20, Math.random() * 40 + 20, 20,
-        buildingColors[Math.floor(Math.random() * buildingColors.length)]
-    );
-    createBuilding(130, i, 20, Math.random() * 40 + 20, 20,
-        buildingColors[Math.floor(Math.random() * buildingColors.length)]
-    );
+// Additional parallel streets
+createStreet(-120, 0, 40, 800);
+createStreet(120, 0, 40, 800);
+createStreet(0, -120, 800, 40);
+createStreet(0, 120, 800, 40);
+
+// ===================== INSULAE (HOUSE BLOCKS) =====================
+const houseColors = [0xc97f5b, 0xb36b4c, 0xd9a066, 0xc28b5b];
+
+function randomHouseColor() {
+    return houseColors[Math.floor(Math.random() * houseColors.length)];
 }
 
+// Place small houses around the grid
+for (let x = -250; x <= 250; x += 80) {
+    for (let z = -250; z <= 250; z += 80) {
+        // Skip center area reserved for forum etc.
+        if (Math.abs(x) < 80 && Math.abs(z) < 80) continue;
 
-// === RESIZE HANDLER ===
+        createBuildingBlock(
+            x + (Math.random() * 20 - 10),
+            z + (Math.random() * 20 - 10),
+            30,
+            30,
+            Math.random() < 0.5 ? 1 : 2,
+            randomHouseColor()
+        );
+    }
+}
+
+// ===================== FORUM (LARGER CENTRAL COMPLEX) =====================
+(function createForum() {
+    const forumBase = createBox(160, 4, 80, 0xd4c29a);
+    forumBase.position.set(0, 2, -60);
+    scene.add(forumBase);
+
+    // Basilica-style hall
+    const basilica = createBuildingBlock(0, -60, 120, 40, 2, 0xb38b6d);
+
+    // Colonnades along the sides
+    const columnColor = 0xe6ddc6;
+    const columnRadius = 2;
+    const columnHeight = 18;
+
+    const colGeo = new THREE.CylinderGeometry(columnRadius, columnRadius, columnHeight, 12);
+    const colMat = new THREE.MeshStandardMaterial({ color: columnColor });
+
+    function addColumn(x, z) {
+        const col = new THREE.Mesh(colGeo, colMat);
+        col.position.set(x, columnHeight / 2, z);
+        col.castShadow = true;
+        scene.add(col);
+    }
+
+    for (let x = -70; x <= 70; x += 14) {
+        addColumn(x, -40);
+        addColumn(x, -80);
+    }
+})();
+
+// ===================== AMPHITHEATRE (LARGER BUILDING) =====================
+(function createAmphitheatre() {
+    const centerX = 260;
+    const centerZ = 200;
+
+    // Ground ellipse
+    const base = createBox(140, 4, 100, 0x9b7b55);
+    base.position.set(centerX, 2, centerZ);
+    scene.add(base);
+
+    // Simple stepped seating using arcs of boxes
+    const rows = 4;
+    for (let r = 0; r < rows; r++) {
+        const radiusX = 70 - r * 8;
+        const radiusZ = 50 - r * 6;
+        const y = 4 + r * 4;
+
+        for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 10) {
+            const w = 10;
+            const d = 6;
+            const seat = createBox(w, 3, d, 0xc29b6f);
+
+            seat.position.set(
+                centerX + Math.cos(angle) * radiusX,
+                y,
+                centerZ + Math.sin(angle) * radiusZ
+            );
+            seat.lookAt(centerX, y, centerZ);
+            scene.add(seat);
+        }
+    }
+})();
+
+// ===================== BIGGER PUBLIC BATHS BLOCK =====================
+(function createBaths() {
+    const x = -260;
+    const z = 220;
+
+    const base = createBox(140, 4, 90, 0xa37d5b);
+    base.position.set(x, 2, z);
+    scene.add(base);
+
+    createBuildingBlock(x - 30, z, 50, 40, 2, 0xb58b63); // hot rooms
+    createBuildingBlock(x + 30, z, 50, 40, 2, 0xb58b63); // cold rooms
+
+    const pool = createBox(80, 2, 30, 0x5da6c2);
+    pool.position.set(x, 3, z - 20);
+    scene.add(pool);
+})();
+
+// ===================== RESIZE HANDLER =====================
 window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-
-// === ANIMATION LOOP ===
+// ===================== ANIMATION LOOP =====================
 function animate() {
     requestAnimationFrame(animate);
     controls.update();
