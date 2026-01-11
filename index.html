@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>3D Pompeii Explorer</title>
+<style>
+    body {
+        margin: 0;
+        overflow: hidden;
+        font-family: Arial, sans-serif;
+    }
+
+    #info-box {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        padding: 12px;
+        background: rgba(255,255,255,0.9);
+        border: 2px solid #333;
+        display: none;
+        max-width: 250px;
+    }
+
+    #info-box h2 {
+        margin-top: 0;
+    }
+</style>
+</head>
+<body>
+
+<div id="info-box">
+    <h2 id="info-title"></h2>
+    <p id="info-text"></p>
+</div>
+
+<!-- Three.js + OrbitControls -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/examples/js/controls/OrbitControls.js"></script>
+
+<script>
+// Scene setup
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xd0d0d0);
+
+const camera = new THREE.PerspectiveCamera(
+    60, window.innerWidth / window.innerHeight, 0.1, 1000
+);
+camera.position.set(20, 20, 20);
+
+// Renderer
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+// Controls (zoom, rotate, pan)
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+
+// Ground plane
+const ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(100, 100),
+    new THREE.MeshPhongMaterial({ color: 0xaaaaaa })
+);
+ground.rotation.x = -Math.PI / 2;
+scene.add(ground);
+
+// Light
+const light = new THREE.DirectionalLight(0xffffff, 1);
+light.position.set(20, 50, 20);
+scene.add(light);
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+
+// Building data
+const buildings = [
+    {
+        name: "House of the Faun",
+        description: "One of Pompeii’s largest and most luxurious residences.",
+        position: { x: -10, y: 1, z: -5 }
+    },
+    {
+        name: "Forum",
+        description: "The political, commercial, and religious center of Pompeii.",
+        position: { x: 5, y: 1, z: 0 }
+    },
+    {
+        name: "Amphitheatre",
+        description: "Used for gladiator games and public entertainment.",
+        position: { x: 10, y: 1, z: -10 }
+    }
+];
+
+// Create simple 3D buildings (replace with real models later)
+const buildingMeshes = [];
+const boxGeometry = new THREE.BoxGeometry(4, 2, 4);
+const boxMaterial = new THREE.MeshPhongMaterial({ color: 0xcc4444 });
+
+buildings.forEach((b, i) => {
+    const mesh = new THREE.Mesh(boxGeometry, boxMaterial.clone());
+    mesh.position.set(b.position.x, b.position.y, b.position.z);
+    mesh.userData = { index: i };
