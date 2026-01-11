@@ -1,19 +1,22 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>3D Pompeii Explorer</title>
+    <meta charset="UTF-8" />
+    <title>3D City Test</title>
     <style>
         body {
             margin: 0;
             overflow: hidden;
         }
+        canvas {
+            display: block;
+        }
     </style>
 
-    <!-- Three.js -->
-    <script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
+    <!-- Three.js core -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <!-- OrbitControls -->
-    <script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://threejs.org/examples/js/controls/OrbitControls.js"></script>
 </head>
 <body>
 <script>
@@ -27,3 +30,115 @@ const camera = new THREE.PerspectiveCamera(
     0.1,
     1000
 );
+camera.position.set(100, 120, 200);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+// LIGHTS
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+scene.add(ambientLight);
+
+const sun = new THREE.DirectionalLight(0xffffff, 1);
+sun.position.set(100, 200, 100);
+scene.add(sun);
+
+// ORBIT CONTROLS
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+
+
+// === GROUND ===
+const groundGeometry = new THREE.PlaneGeometry(800, 800);
+const groundMaterial = new THREE.MeshStandardMaterial({ color: 0x99cc99 });
+const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+ground.rotation.x = -Math.PI / 2;
+scene.add(ground);
+
+
+// === STREETS ===
+function createStreet(x, z, width, depth) {
+    const geometry = new THREE.BoxGeometry(width, 0.1, depth);
+    const material = new THREE.MeshStandardMaterial({ color: 0x333333 });
+    const street = new THREE.Mesh(geometry, material);
+    street.position.set(x, 0.05, z);
+    scene.add(street);
+}
+
+// Horizontal streets
+createStreet(0, -50, 600, 20);
+createStreet(0, 0, 600, 20);
+createStreet(0, 50, 600, 20);
+
+// Vertical streets
+createStreet(-100, 0, 20, 300);
+createStreet(0, 0, 20, 300);
+createStreet(100, 0, 20, 300);
+
+
+// === BUILDINGS ===
+function createBuilding(x, z, width, height, depth, color) {
+    const geometry = new THREE.BoxGeometry(width, height, depth);
+    const material = new THREE.MeshStandardMaterial({ color });
+    const building = new THREE.Mesh(geometry, material);
+    building.position.set(x, height / 2, z);
+    scene.add(building);
+}
+
+const buildingColors = [0xff6666, 0x66a3ff, 0xffcc66, 0x66ff99, 0xcc99ff];
+
+for (let i = -250; i <= 250; i += 50) {
+    createBuilding(
+        i,
+        -80,
+        20,
+        Math.random() * 40 + 20,
+        20,
+        buildingColors[Math.floor(Math.random() * buildingColors.length)]
+    );
+    createBuilding(
+        i,
+        80,
+        20,
+        Math.random() * 40 + 20,
+        20,
+        buildingColors[Math.floor(Math.random() * buildingColors.length)]
+    );
+    createBuilding(
+        -130,
+        i,
+        20,
+        Math.random() * 40 + 20,
+        20,
+        buildingColors[Math.floor(Math.random() * buildingColors.length)]
+    );
+    createBuilding(
+        130,
+        i,
+        20,
+        Math.random() * 40 + 20,
+        20,
+        buildingColors[Math.floor(Math.random() * buildingColors.length)]
+    );
+}
+
+
+// === RESIZE HANDLER ===
+window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+
+// === ANIMATION LOOP ===
+function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+    renderer.render(scene, camera);
+}
+animate();
+</script>
+</body>
+</html>
