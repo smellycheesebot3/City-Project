@@ -1,227 +1,456 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8" />
-    <title>3D Pompeii Explorer</title>
-    <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-        }
-        canvas {
-            display: block;
-        }
-    </style>
+<meta charset="UTF-8">
+<title>City - Project</title>
+<style>
+body { margin: 0; overflow: hidden; }
+</style>
 
-    <!-- Three.js (stable CDN, works with GitHub Pages) -->
-    <script src="https://unpkg.com/three@0.152.2/build/three.min.js"></script>
-
-    <!-- OrbitControls from same Three.js version -->
-    <script src="https://unpkg.com/three@0.152.2/examples/js/controls/OrbitControls.js"></script>
+<!-- Three.js -->
+<script src="https://unpkg.com/three@0.152.2/build/three.min.js"></script>
 </head>
 <body>
+
 <script>
-// ===================== BASIC SCENE SETUP =====================
+// ===================== ERROR DISPLAY =====================
+window.onerror = function (msg, url, line, col, error) {
+document.body.innerHTML =
+"<div style='padding:20px;font-size:20px;color:white;background:black;'>" +
+"<b>JavaScript Error:</b><br>" +
+msg + "<br><br>" +
+"<b>Line:</b> " + line + "<br>" +
+"<b>Column:</b> " + col + "<br>" +
+"<b>URL:</b> " + url + "<br><br>" +
+"<b>Details:</b><br>" +
+error +
+"</div>";
+};
+
+// ===================== SCENE =====================
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x87ceeb); // sky blue
+scene.background = new THREE.Color(0x87ceeb);
 
+// ===================== CAMERA =====================
 const camera = new THREE.PerspectiveCamera(
-    60,
-    window.innerWidth / window.innerHeight,
-    0.1,
-    2000
+60,
+window.innerWidth / window.innerHeight,
+0.1,
+2000
 );
-camera.position.set(250, 200, 350);
+camera.position.set(0, 20, 50);
 
+// ===================== RENDERER =====================
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.shadowMap.enabled = true;
 document.body.appendChild(renderer.domElement);
 
-// ===================== LIGHTING =====================
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-scene.add(ambientLight);
+// Simple, stable lighting
+const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 1.2);
+scene.add(hemi);
 
-const sun = new THREE.DirectionalLight(0xffffff, 1.0);
-sun.position.set(300, 400, 200);
-sun.castShadow = true;
-sun.shadow.mapSize.width = 2048;
-sun.shadow.mapSize.height = 2048;
-scene.add(sun);
+// ===================== BACKGROUND MUSIC =====================
+const listener = new THREE.AudioListener();
+camera.add(listener);
 
-// ===================== ORBIT CONTROLS =====================
-const controls = new THREE.OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true;
-controls.dampingFactor = 0.05;
-controls.rotateSpeed = 0.7;
-controls.zoomSpeed = 1.0;
-controls.panSpeed = 0.8;
+const bgMusic = new THREE.Audio(listener);
+const audioLoader = new THREE.AudioLoader();
 
-// Focus on center of town
-controls.target.set(0, 10, 0);
+// Replace this with any MP3 URL you want
+audioLoader.load(
+"https://cdn.pixabay.com/download/audio/2022/03/15/audio_3b4f2f1d2b.mp3?filename=ancient-rome-ambient-110624.mp3",
+function(buffer) {
+bgMusic.setBuffer(buffer);
+bgMusic.setLoop(true);
+bgMusic.setVolume(0.4);
+bgMusic.play();
+}
+);
 
-// ===================== GROUND (TOWN PLATFORM) =====================
-const groundGeometry = new THREE.PlaneGeometry(1200, 1200);
-const groundMaterial = new THREE.MeshStandardMaterial({ color: 0xc9b28a }); // dusty earth
-const ground = new THREE.Mesh(groundGeometry, groundMaterial);
-ground.rotation.x = -Math.PI / 2;
-ground.receiveShadow = true;
-scene.add(ground);
+// ===================== FLOOR =====================
+const floor = new THREE.Mesh(
+new THREE.PlaneGeometry(800, 800),
+new THREE.MeshStandardMaterial({ color: 0x7A6855 })
+);
+floor.rotation.x = -Math.PI / 2;
+scene.add(floor);
 
-// ===================== UTILITY FUNCTIONS =====================
-function createBox(w, h, d, color) {
-    const geo = new THREE.BoxGeometry(w, h, d);
-    const mat = new THREE.MeshStandardMaterial({ color });
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    return mesh;
+// ===================== STREETS =====================
+const streetMaterial = new THREE.MeshStandardMaterial({ color: 0x6e6e6e });
+
+// Main street
+const street1 = new THREE.Mesh(
+new THREE.PlaneGeometry(630, 25),
+streetMaterial
+);
+street1.rotation.x = -Math.PI / 2;
+street1.position.set(0, 0.1, 0);
+scene.add(street1);
+
+// Cross street
+const street2 = new THREE.Mesh(
+new THREE.PlaneGeometry(25, 630),
+streetMaterial
+);
+street2.rotation.x = -Math.PI / 2;
+street2.position.set(0, 0.1, 0);
+scene.add(street2);
+
+// ===================== STREET AVOIDANCE =====================
+function isOnStreet(x, z) {
+const streetWidth = 20;
+
+if (Math.abs(z) < streetWidth / 2) return true;
+if (Math.abs(x) < streetWidth / 2) return true;
+
+return false;
 }
 
-function createStreet(x, z, width, depth, rotation = 0) {
-    const street = createBox(width, 0.5, depth, 0x555555);
-    street.position.set(x, 0.25, z);
-    street.rotation.y = rotation;
-    scene.add(street);
-    return street;
+// ===================== TEXTURES =====================
+const texLoader = new THREE.TextureLoader();
+
+// Public-domain textures (as in your original)
+const wallTex = texLoader.load("https://cdn.jsdelivr.net/gh/Poly-Haven/Textures/plaster/plaster_01_diff_1k.jpg");
+const wallNorm = texLoader.load("https://cdn.jsdelivr.net/gh/Poly-Haven/Textures/plaster/plaster_01_nor_gl_1k.png");
+const wallRough = texLoader.load("https://cdn.jsdelivr.net/gh/Poly-Haven/Textures/plaster/plaster_01_rough_1k.jpg");
+
+const roofTex = texLoader.load("https://cdn.jsdelivr.net/gh/Poly-Haven/Textures/roof_tiles/roof_tiles_02_diff_1k.jpg");
+const roofNorm = texLoader.load("https://cdn.jsdelivr.net/gh/Poly-Haven/Textures/roof_tiles/roof_tiles_02_nor_gl_1k.png");
+
+const stoneTex = texLoader.load("https://cdn.jsdelivr.net/gh/Poly-Haven/Textures/stone/stone_wall_02_diff_1k.jpg");
+const stoneNorm = texLoader.load("https://cdn.jsdelivr.net/gh/Poly-Haven/Textures/stone/stone_wall_02_nor_gl_1k.png");
+
+// Make the stone texture tile nicely on the volcano
+stoneTex.wrapS = stoneTex.wrapT = THREE.RepeatWrapping;
+stoneTex.repeat.set(4, 4);
+stoneNorm.wrapS = stoneNorm.wrapT = THREE.RepeatWrapping;
+stoneNorm.repeat.set(4, 4);
+
+// ===================== VESUVIUS FOOTPRINT (for building clipping) =====================
+
+// Ground-level position of volcano center
+const VESUVIUS_CENTER = new THREE.Vector3(0, 0, -400);
+// Approx radius where the cone meets the ground
+const VESUVIUS_RADIUS = 190;
+
+function isInsideVesuvius(x, z) {
+const dx = x - VESUVIUS_CENTER.x;
+const dz = z - VESUVIUS_CENTER.z;
+const distSq = dx * dx + dz * dz;
+return distSq < VESUVIUS_RADIUS * VESUVIUS_RADIUS;
 }
 
-function createBuildingBlock(x, z, w, d, stories = 1, color = 0xb36b4c) {
-    const heightPerStory = 8;
-    const h = stories * heightPerStory;
-    const building = createBox(w, h, d, color);
-    building.position.set(x, h / 2, z);
-    scene.add(building);
-    return building;
-}
+// ===================== REALISTIC POMPEII BUILDINGS =====================
 
-// ===================== POMPEII-LIKE CITY LAYOUT =====================
-// Main cardo (north-south street) and decumanus (east-west street)
-createStreet(0, 0, 40, 800);    // main north-south
-createStreet(0, 0, 800, 40);    // main east-west
+function createBrokenBuilding(x, z, w, h, d) {
+if (isOnStreet(x, z)) return;
 
-// Additional parallel streets
-createStreet(-120, 0, 40, 800);
-createStreet(120, 0, 40, 800);
-createStreet(0, -120, 800, 40);
-createStreet(0, 120, 800, 40);
+// Random variation
+w *= 0.75 + Math.random() * 0.25;
+h *= 0.55 + Math.random() * 0.45;
+d *= 0.75 + Math.random() * 0.25;
 
-// ===================== INSULAE (HOUSE BLOCKS) =====================
-const houseColors = [0xc97f5b, 0xb36b4c, 0xd9a066, 0xc28b5b];
+// Dark Pompeii-style colour
+const baseColor = new THREE.Color().setHSL(
+0.04 + Math.random() * 0.03,
+0.35 + Math.random() * 0.1,
+0.25 + Math.random() * 0.15
+);
 
-function randomHouseColor() {
-    return houseColors[Math.floor(Math.random() * houseColors.length)];
-}
-
-// Place small houses around the grid
-for (let x = -250; x <= 250; x += 80) {
-    for (let z = -250; z <= 250; z += 80) {
-        // Skip center area reserved for forum etc.
-        if (Math.abs(x) < 80 && Math.abs(z) < 80) continue;
-
-        createBuildingBlock(
-            x + (Math.random() * 20 - 10),
-            z + (Math.random() * 20 - 10),
-            30,
-            30,
-            Math.random() < 0.5 ? 1 : 2,
-            randomHouseColor()
-        );
-    }
-}
-
-// ===================== FORUM (LARGER CENTRAL COMPLEX) =====================
-(function createForum() {
-    const forumBase = createBox(160, 4, 80, 0xd4c29a);
-    forumBase.position.set(0, 2, -60);
-    scene.add(forumBase);
-
-    // Basilica-style hall
-    const basilica = createBuildingBlock(0, -60, 120, 40, 2, 0xb38b6d);
-
-    // Colonnades along the sides
-    const columnColor = 0xe6ddc6;
-    const columnRadius = 2;
-    const columnHeight = 18;
-
-    const colGeo = new THREE.CylinderGeometry(columnRadius, columnRadius, columnHeight, 12);
-    const colMat = new THREE.MeshStandardMaterial({ color: columnColor });
-
-    function addColumn(x, z) {
-        const col = new THREE.Mesh(colGeo, colMat);
-        col.position.set(x, columnHeight / 2, z);
-        col.castShadow = true;
-        scene.add(col);
-    }
-
-    for (let x = -70; x <= 70; x += 14) {
-        addColumn(x, -40);
-        addColumn(x, -80);
-    }
-})();
-
-// ===================== AMPHITHEATRE (LARGER BUILDING) =====================
-(function createAmphitheatre() {
-    const centerX = 260;
-    const centerZ = 200;
-
-    // Ground ellipse
-    const base = createBox(140, 4, 100, 0x9b7b55);
-    base.position.set(centerX, 2, centerZ);
-    scene.add(base);
-
-    // Simple stepped seating using arcs of boxes
-    const rows = 4;
-    for (let r = 0; r < rows; r++) {
-        const radiusX = 70 - r * 8;
-        const radiusZ = 50 - r * 6;
-        const y = 4 + r * 4;
-
-        for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 10) {
-            const w = 10;
-            const d = 6;
-            const seat = createBox(w, 3, d, 0xc29b6f);
-
-            seat.position.set(
-                centerX + Math.cos(angle) * radiusX,
-                y,
-                centerZ + Math.sin(angle) * radiusZ
-            );
-            seat.lookAt(centerX, y, centerZ);
-            scene.add(seat);
-        }
-    }
-})();
-
-// ===================== BIGGER PUBLIC BATHS BLOCK =====================
-(function createBaths() {
-    const x = -260;
-    const z = 220;
-
-    const base = createBox(140, 4, 90, 0xa37d5b);
-    base.position.set(x, 2, z);
-    scene.add(base);
-
-    createBuildingBlock(x - 30, z, 50, 40, 2, 0xb58b63); // hot rooms
-    createBuildingBlock(x + 30, z, 50, 40, 2, 0xb58b63); // cold rooms
-
-    const pool = createBox(80, 2, 30, 0x5da6c2);
-    pool.position.set(x, 3, z - 20);
-    scene.add(pool);
-})();
-
-// ===================== RESIZE HANDLER =====================
-window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
+const material = new THREE.MeshStandardMaterial({
+color: baseColor,
+roughness: 0.95,
+metalness: 0.0
 });
+
+const building = new THREE.Mesh(
+new THREE.BoxGeometry(w, h, d),
+material
+);
+building.geometry.computeVertexNormals();
+building.position.set(x, h / 2, z);
+
+// Slight tilt
+building.rotation.y = (Math.random() - 0.5) * 0.15;
+
+scene.add(building);
+
+// ===================== DOOR FRAME =====================
+const doorWidth = w * (0.25 + Math.random() * 0.15);
+const doorHeight = h * (0.35 + Math.random() * 0.15);
+
+const doorGeo = new THREE.BoxGeometry(doorWidth, doorHeight, 0.2);
+const doorMat = new THREE.MeshStandardMaterial({
+color: 0x2a1a0f, // dark wood/charcoal
+roughness: 0.9
+});
+
+const door = new THREE.Mesh(doorGeo, doorMat);
+
+// Position door on the front face
+door.position.set(
+x,
+doorHeight / 2,
+z + d / 2 + 0.11
+);
+
+scene.add(door);
+}
+
+// ===================== EXTRA BUILDING RINGS =====================
+for (let x = -180; x <= 180; x += 45) {
+for (let z = -180; z <= 180; z += 45) {
+if (!isOnStreet(x, z)) {
+createBrokenBuilding(
+x, z,
+20 + Math.random()*20,
+12 + Math.random()*18,
+20 + Math.random()*20
+);
+}
+}
+}
+
+// Outskirts
+for (let x = -260; x <= 260; x += 65) {
+for (let z = -260; z <= 260; z += 65) {
+if (!isOnStreet(x, z)) {
+createBrokenBuilding(
+x, z,
+25 + Math.random()*25,
+15 + Math.random()*20,
+25 + Math.random()*25
+);
+}
+}
+}
+
+// Random small ruins
+for (let i = 0; i < 80; i++) {
+const x = (Math.random() - 0.5) * 600;
+const z = (Math.random() - 0.5) * 600;
+
+if (!isOnStreet(x, z)) {
+createBrokenBuilding(
+x, z,
+10 + Math.random()*10,
+6 + Math.random()*8,
+10 + Math.random()*10
+);
+}
+}
+
+// Main street buildings
+for (let i = -120; i <= 120; i += 40) {
+createBrokenBuilding(i, -30, 25 + Math.random()*10, 15 + Math.random()*10, 25);
+createBrokenBuilding(i, 30, 25 + Math.random()*10, 15 + Math.random()*10, 25);
+}
+
+// Cross street buildings
+for (let i = -120; i <= 120; i += 40) {
+createBrokenBuilding(-30, i, 25, 15 + Math.random()*10, 25);
+createBrokenBuilding( 30, i, 25, 15 + Math.random()*10, 25);
+}
+
+// Fill city blocks
+for (let x = -100; x <= 100; x += 50) {
+for (let z = -100; z <= 100; z += 50) {
+if (!isOnStreet(x, z)) {
+createBrokenBuilding(
+x, z,
+20 + Math.random()*15,
+12 + Math.random()*15,
+20 + Math.random()*15
+);
+}
+}
+}
+
+// ===================== MOUNT VESUVIUS (more realistic) =====================
+
+const vesuviusGroup = new THREE.Group();
+
+// Main rocky cone
+const vesuviusGeometry = new THREE.ConeGeometry(200, 260, 64, 8);
+const vesuviusMaterial = new THREE.MeshStandardMaterial({
+map: stoneTex,
+normalMap: stoneNorm,
+roughness: 1.0,
+metalness: 0.0
+});
+const vesuviusMain = new THREE.Mesh(vesuviusGeometry, vesuviusMaterial);
+vesuviusMain.castShadow = false;
+vesuviusMain.receiveShadow = false;
+vesuviusGroup.add(vesuviusMain);
+
+// Darker, steeper inner cone near top
+const innerGeo = new THREE.ConeGeometry(120, 160, 32, 4);
+const innerMat = new THREE.MeshStandardMaterial({
+color: 0x3b2b23,
+roughness: 1.0,
+metalness: 0.0
+});
+const innerCone = new THREE.Mesh(innerGeo, innerMat);
+innerCone.position.y = 80;
+vesuviusGroup.add(innerCone);
+
+// Crater rim (ring)
+const craterRimGeo = new THREE.CylinderGeometry(70, 80, 12, 32, 1, true);
+const craterRimMat = new THREE.MeshStandardMaterial({
+color: 0x2d1f17,
+roughness: 1.0,
+metalness: 0.0,
+side: THREE.DoubleSide
+});
+const craterRim = new THREE.Mesh(craterRimGeo, craterRimMat);
+craterRim.position.y = 130;
+vesuviusGroup.add(craterRim);
+
+// Dark crater interior
+const craterInnerGeo = new THREE.ConeGeometry(65, 40, 32);
+const craterInnerMat = new THREE.MeshStandardMaterial({
+color: 0x1a120d,
+roughness: 1.0,
+metalness: 0.0
+});
+const craterInner = new THREE.Mesh(craterInnerGeo, craterInnerMat);
+craterInner.position.y = 130;
+craterInner.rotation.x = Math.PI;
+vesuviusGroup.add(craterInner);
+
+// Ash field around the volcano base
+const ashFieldGeo = new THREE.CircleGeometry(260, 48);
+const ashFieldMat = new THREE.MeshStandardMaterial({
+color: 0x2b2b2b,
+roughness: 1.0,
+metalness: 0.0
+});
+const ashField = new THREE.Mesh(ashFieldGeo, ashFieldMat);
+ashField.rotation.x = -Math.PI / 2;
+ashField.position.y = 0.02;
+vesuviusGroup.add(ashField);
+
+// Position whole volcano behind the city
+vesuviusGroup.position.set(0, 125, -400);
+scene.add(vesuviusGroup);
+
+// ===================== WASD KEYS =====================
+const keys = { w: false, a: false, s: false, d: false };
+
+document.addEventListener("keydown", e => {
+const k = e.key.toLowerCase();
+if (keys[k] !== undefined) keys[k] = true;
+});
+
+document.addEventListener("keyup", e => {
+const k = e.key.toLowerCase();
+if (keys[k] !== undefined) keys[k] = false;
+});
+
+// ===================== MOUSE LOOK =====================
+let isMouseDown = false;
+let prevX = 0;
+let prevY = 0;
+
+document.addEventListener("mousedown", (e) => {
+isMouseDown = true;
+prevX = e.clientX;
+prevY = e.clientY;
+});
+
+document.addEventListener("mouseup", () => {
+isMouseDown = false;
+});
+
+document.addEventListener("mousemove", (e) => {
+if (!isMouseDown) return;
+
+const dx = e.clientX - prevX;
+const dy = e.clientY - prevY;
+
+prevX = e.clientX;
+prevY = e.clientY;
+
+const sensitivity = 0.002;
+
+camera.rotation.y -= dx * sensitivity;
+camera.rotation.x -= dy * sensitivity;
+
+const limit = Math.PI / 2 - 0.1;
+camera.rotation.x = Math.max(-limit, Math.min(limit, camera.rotation.x));
+});
+
+// ===================== MOVEMENT FUNCTION =====================
+function updateMovement() {
+const speed = 1.0;
+
+const forward = new THREE.Vector3();
+camera.getWorldDirection(forward);
+
+const right = new THREE.Vector3();
+right.crossVectors(camera.up, forward).normalize();
+
+if (keys.w) camera.position.add(forward.multiplyScalar(speed));
+if (keys.s) camera.position.add(forward.multiplyScalar(-speed));
+if (keys.a) camera.position.add(right.multiplyScalar(speed));
+if (keys.d) camera.position.add(right.multiplyScalar(-speed));
+}
+
+// ===================== PEOPLE WALKING =====================
+const people = [];
+
+function createPerson(px, pz) {
+const bodyGeo = new THREE.CapsuleGeometry(1, 2, 4, 8);
+const bodyMat = new THREE.MeshStandardMaterial({
+color: new THREE.Color().setHSL(
+Math.random(),
+0.4,
+0.4
+)
+});
+
+const person = new THREE.Mesh(bodyGeo, bodyMat);
+person.position.set(px, 1.5, pz);
+
+// Random direction
+person.userData.dir = new THREE.Vector3(
+Math.random() - 0.5,
+0,
+Math.random() - 0.5
+).normalize();
+
+people.push(person);
+scene.add(person);
+}
+
+// Spawn 20 people
+for (let i = 0; i < 20; i++) {
+const px = (Math.random() - 0.5) * 500;
+const pz = (Math.random() - 0.5) * 500;
+if (!isOnStreet(px, pz)) createPerson(px, pz);
+}
 
 // ===================== ANIMATION LOOP =====================
 function animate() {
-    requestAnimationFrame(animate);
-    controls.update();
-    renderer.render(scene, camera);
+requestAnimationFrame(animate);
+
+updateMovement();
+
+// Move people slowly
+for (const p of people) {
+p.position.addScaledVector(p.userData.dir, 0.05);
+
+// Randomly change direction
+if (Math.random() < 0.005) {
+p.userData.dir = new THREE.Vector3(
+Math.random() - 0.5,
+0,
+Math.random() - 0.5
+).normalize();
+}
+}
+
+renderer.render(scene, camera);
 }
 animate();
 </script>
